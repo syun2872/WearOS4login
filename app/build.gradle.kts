@@ -5,12 +5,11 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")version "3.0.3"
 }
 
 android {
     namespace = "com.example.wearos4.presentation"
-    compileSdk = 35
+    compileSdk = 35 // ここで直接指定
 
     defaultConfig {
         applicationId = "com.example.wearos4.presentation"
@@ -57,17 +56,12 @@ dependencies {
     implementation(libs.core.splashscreen)
     implementation(libs.material3.android)
 
-    // Firebase
-    implementation(platform(libs.firebase.bom)) // Firebase BOMを指定
-    implementation(libs.google.firebase.auth) // Firebase Authを使用
-    implementation(libs.google.firebase.analytics)
-    implementation(libs.appcompat) // Firebase Analyticsを使用
-
-    // テスト関連
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
 
-    // デバッグ用
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
 }

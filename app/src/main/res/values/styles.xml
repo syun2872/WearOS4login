@@ -1,6 +1,0 @@
-<resources>
-    <!-- AppCompatテーマを継承 -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- 必要に応じてカスタマイズ -->
-    </style>
-</resources>
