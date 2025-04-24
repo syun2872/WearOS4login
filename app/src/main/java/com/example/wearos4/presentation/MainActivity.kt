@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
     private val PREF_NICKNAME = "nickname"
     private val PREF_PIN = "pin"
 
-    private var startTime: Date = Date()  // ボタンが押される時刻を記録する変数
+    private lateinit var startTime: Date
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,7 +40,6 @@ class MainActivity : ComponentActivity() {
             val focusManager = LocalFocusManager.current
 
             if (isFirstLogin) {
-                // 初回ログイン
                 var nickname by remember { mutableStateOf("") }
                 var pin by remember { mutableStateOf("") }
                 var errorMessage by remember { mutableStateOf("") }
@@ -138,7 +137,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } else {
-                // ログイン画面
                 var nicknameInput by remember { mutableStateOf("") }
                 var pinInput by remember { mutableStateOf("") }
                 var errorMessage by remember { mutableStateOf("") }
@@ -250,6 +248,9 @@ class MainActivity : ComponentActivity() {
             var result by remember { mutableStateOf("") }
             val sdf = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
+            // 開始時間を記録
+            startTime = Date()
+
             Surface(modifier = Modifier.fillMaxSize()) {
                 Column(
                     modifier = Modifier
@@ -263,21 +264,18 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Button(onClick = {
-                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "〇")
                         }) {
                             Text("〇")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
-                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "？")
                         }) {
                             Text("？")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
-                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "☓")
                         }) {
                             Text("☓")
@@ -286,15 +284,23 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("押した時間: $result")
+                    Text(
+                        text = result,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
             }
         }
     }
 
-    private fun calculateTime(sdf: SimpleDateFormat, buttonLabel: String): String {
+    private fun calculateTime(sdf: SimpleDateFormat, label: String): String {
         val endTime = Date()
-        val timeDifference = endTime.time - startTime.time
-        return "$buttonLabel ボタン押下: ${sdf.format(endTime)} (経過時間: ${timeDifference}ms)"
+        val durationMillis = endTime.time - startTime.time
+        val durationSeconds = durationMillis / 1000.0
+
+        val startFormatted = sdf.format(startTime)
+        val endFormatted = sdf.format(endTime)
+
+        return "ボタン「$label」\n開始: $startFormatted\n終了: $endFormatted\n経過: $durationSeconds 秒"
     }
 }
