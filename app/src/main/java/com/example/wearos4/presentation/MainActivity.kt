@@ -2,7 +2,6 @@ package com.example.wearos4.presentation
 
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,27 +14,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
-
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import java.text.SimpleDateFormat
 import java.util.*
 
-
-
 class MainActivity : ComponentActivity() {
 
-    private lateinit var startTime: Date
     private lateinit var sharedPreferences: SharedPreferences
     private val PREFS_NAME = "UserPreferences"
     private val PREF_NICKNAME = "nickname"
     private val PREF_PIN = "pin"
 
+    private var startTime: Date = Date()  // ボタンが押される時刻を記録する変数
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        startTime = Date()
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
         val isFirstLogin = sharedPreferences.getString(PREF_NICKNAME, null) == null
@@ -44,8 +40,10 @@ class MainActivity : ComponentActivity() {
             val focusManager = LocalFocusManager.current
 
             if (isFirstLogin) {
+                // 初回ログイン
                 var nickname by remember { mutableStateOf("") }
                 var pin by remember { mutableStateOf("") }
+                var errorMessage by remember { mutableStateOf("") }
 
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
@@ -81,43 +79,69 @@ class MainActivity : ComponentActivity() {
                             keyboardActions = KeyboardActions(
                                 onDone = {
                                     focusManager.clearFocus()
-                                    if (nickname.isNotEmpty() && pin.length == 4) {
+
+                                    // エラーチェック
+                                    errorMessage = when {
+                                        nickname.isEmpty() -> "ニックネームを入力してください"
+                                        pin.length != 4 -> "PINコードは4桁で入力してください"
+                                        else -> ""
+                                    }
+
+                                    if (errorMessage.isEmpty()) {
                                         sharedPreferences.edit {
                                             putString(PREF_NICKNAME, nickname)
                                             putString(PREF_PIN, pin)
                                         }
-                                        Toast.makeText(this@MainActivity, "ログイン完了！", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
                                         navigateToMainScreen()
                                     } else {
-                                        Toast.makeText(this@MainActivity, "ニックネームとPINコードを正しく入力してください", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             )
                         )
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        // エラーメッセージの表示
+                        if (errorMessage.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
                         Button(
                             onClick = {
-                                if (nickname.isNotEmpty() && pin.length == 4) {
+                                // エラーチェック
+                                errorMessage = when {
+                                    nickname.isEmpty() -> "ニックネームを入力してください"
+                                    pin.length != 4 -> "PINコードは4桁で入力してください"
+                                    else -> ""
+                                }
+
+                                if (errorMessage.isEmpty()) {
                                     sharedPreferences.edit {
                                         putString(PREF_NICKNAME, nickname)
                                         putString(PREF_PIN, pin)
                                     }
-                                    Toast.makeText(this@MainActivity, "ログイン完了！", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
                                     navigateToMainScreen()
                                 } else {
-                                    Toast.makeText(this@MainActivity, "ニックネームとPINコードを正しく入力してください", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("ログイン")
+                            Text("新規登録")
                         }
                     }
                 }
             } else {
+                // ログイン画面
                 var nicknameInput by remember { mutableStateOf("") }
                 var pinInput by remember { mutableStateOf("") }
+                var errorMessage by remember { mutableStateOf("") }
 
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
@@ -153,6 +177,51 @@ class MainActivity : ComponentActivity() {
                             keyboardActions = KeyboardActions(
                                 onDone = {
                                     focusManager.clearFocus()
+
+                                    // エラーチェック
+                                    errorMessage = when {
+                                        nicknameInput.isEmpty() -> "ニックネームを入力してください"
+                                        pinInput.length != 4 -> "PINコードは4桁で入力してください"
+                                        else -> ""
+                                    }
+
+                                    if (errorMessage.isEmpty()) {
+                                        val savedNickname = sharedPreferences.getString(PREF_NICKNAME, null)
+                                        val savedPin = sharedPreferences.getString(PREF_PIN, null)
+
+                                        if (nicknameInput == savedNickname && pinInput == savedPin) {
+                                            Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
+                                            navigateToMainScreen()
+                                        } else {
+                                            Toast.makeText(this@MainActivity, "ニックネームまたはPINコードが間違っています", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // エラーメッセージの表示
+                        if (errorMessage.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                // エラーチェック
+                                errorMessage = when {
+                                    nicknameInput.isEmpty() -> "ニックネームを入力してください"
+                                    pinInput.length != 4 -> "PINコードは4桁で入力してください"
+                                    else -> ""
+                                }
+
+                                if (errorMessage.isEmpty()) {
                                     val savedNickname = sharedPreferences.getString(PREF_NICKNAME, null)
                                     val savedPin = sharedPreferences.getString(PREF_PIN, null)
 
@@ -162,21 +231,8 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Toast.makeText(this@MainActivity, "ニックネームまたはPINコードが間違っています", Toast.LENGTH_SHORT).show()
                                     }
-                                }
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Button(
-                            onClick = {
-                                val savedNickname = sharedPreferences.getString(PREF_NICKNAME, null)
-                                val savedPin = sharedPreferences.getString(PREF_PIN, null)
-
-                                if (nicknameInput == savedNickname && pinInput == savedPin) {
-                                    Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
-                                    navigateToMainScreen()
                                 } else {
-                                    Toast.makeText(this@MainActivity, "ニックネームまたはPINコードが間違っています", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -207,18 +263,21 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Button(onClick = {
+                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "〇")
                         }) {
                             Text("〇")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
+                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "？")
                         }) {
                             Text("？")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
+                            startTime = Date()  // ボタンが押された時刻を記録
                             result = calculateTime(sdf, "☓")
                         }) {
                             Text("☓")
@@ -227,25 +286,15 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = result,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Text("押した時間: $result")
                 }
             }
         }
     }
 
-    private fun calculateTime(sdf: SimpleDateFormat, label: String): String {
+    private fun calculateTime(sdf: SimpleDateFormat, buttonLabel: String): String {
         val endTime = Date()
-        val durationMillis = endTime.time - startTime.time
-        val durationSeconds = durationMillis / 1000.0
-
-        val startFormatted = sdf.format(startTime)
-        val endFormatted = sdf.format(endTime)
-
-        Log.d("TimeResult", "Start: $startFormatted, End: $endFormatted, Duration: $durationSeconds 秒")
-
-        return "ボタン「$label」\n開始: $startFormatted\n終了: $endFormatted\n経過: $durationSeconds 秒"
+        val timeDifference = endTime.time - startTime.time
+        return "$buttonLabel ボタン押下: ${sdf.format(endTime)} (経過時間: ${timeDifference}ms)"
     }
 }
