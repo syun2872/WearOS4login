@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.core.splashscreen)
     implementation(libs.material3.android)
+    implementation(libs.firebase.auth.ktx)
 
     // テスト関連
     androidTestImplementation(platform(libs.compose.bom))
