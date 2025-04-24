@@ -1,5 +1,3 @@
-import com.android.build.gradle.ProguardFiles.getDefaultProguardFile
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -44,8 +42,12 @@ android {
 }
 
 dependencies {
-    implementation(libs.play.services.wearable)
-    implementation(platform(libs.compose.bom))
+    // Firebaseの依存関係
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+
+    // Composeの依存関係
+    implementation(platform(libs.compose.bom))  // BOMを使用してComposeのバージョン管理
     implementation(libs.ui)
     implementation(libs.ui.graphics)
     implementation(libs.ui.tooling.preview)
@@ -56,12 +58,16 @@ dependencies {
     implementation(libs.core.splashscreen)
     implementation(libs.material3.android)
 
+    // テスト関連
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
 
+    // デバッグ用
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
+    implementation("androidx.compose.ui:ui-text")
+    implementation("androidx.compose.ui:ui")
+
 }
+
