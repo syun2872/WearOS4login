@@ -34,16 +34,11 @@ class MainActivity : ComponentActivity() {
 
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
-        val isFirstLogin = sharedPreferences.getString(PREF_NICKNAME, null) == null
-
         setContent {
-            val focusManager = LocalFocusManager.current
+            var isFirstLogin by remember { mutableStateOf(true) }
 
             if (isFirstLogin) {
-                var nickname by remember { mutableStateOf("") }
-                var pin by remember { mutableStateOf("") }
-                var errorMessage by remember { mutableStateOf("") }
-
+                // 新規登録かログイン選択画面
                 Surface(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier
@@ -52,131 +47,93 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        TextField(
-                            value = nickname,
-                            onValueChange = { nickname = it },
-                            label = { Text("ニックネーム") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Text,
-                                imeAction = ImeAction.Next
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        TextField(
-                            value = pin,
-                            onValueChange = { pin = it },
-                            label = { Text("PINコード") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    focusManager.clearFocus()
-
-                                    // エラーチェック
-                                    errorMessage = when {
-                                        nickname.isEmpty() -> "ニックネームを入力してください"
-                                        pin.length != 4 -> "PINコードは4桁で入力してください"
-                                        else -> ""
-                                    }
-
-                                    if (errorMessage.isEmpty()) {
-                                        sharedPreferences.edit {
-                                            putString(PREF_NICKNAME, nickname)
-                                            putString(PREF_PIN, pin)
-                                        }
-                                        Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
-                                        navigateToMainScreen()
-                                    } else {
-                                        Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // エラーメッセージの表示
-                        if (errorMessage.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = errorMessage,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
                         Button(
                             onClick = {
-                                // エラーチェック
-                                errorMessage = when {
-                                    nickname.isEmpty() -> "ニックネームを入力してください"
-                                    pin.length != 4 -> "PINコードは4桁で入力してください"
-                                    else -> ""
-                                }
-
-                                if (errorMessage.isEmpty()) {
-                                    sharedPreferences.edit {
-                                        putString(PREF_NICKNAME, nickname)
-                                        putString(PREF_PIN, pin)
-                                    }
-                                    Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
-                                    navigateToMainScreen()
-                                } else {
-                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
-                                }
+                                isFirstLogin = false
+                                // 新規登録画面に移行
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("新規登録")
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = {
+                                isFirstLogin = false
+                                // ログイン画面に移行
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("ログイン")
+                        }
                     }
                 }
             } else {
-                var nicknameInput by remember { mutableStateOf("") }
-                var pinInput by remember { mutableStateOf("") }
-                var errorMessage by remember { mutableStateOf("") }
+                val isExistingUser = sharedPreferences.getString(PREF_NICKNAME, null) != null
+                if (isExistingUser) {
+                    // ログイン画面
+                    var nicknameInput by remember { mutableStateOf("") }
+                    var pinInput by remember { mutableStateOf("") }
+                    var errorMessage by remember { mutableStateOf("") }
 
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        TextField(
-                            value = nicknameInput,
-                            onValueChange = { nicknameInput = it },
-                            label = { Text("ニックネーム") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Text,
-                                imeAction = ImeAction.Next
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            TextField(
+                                value = nicknameInput,
+                                onValueChange = { nicknameInput = it },
+                                label = { Text("ニックネーム") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Next
+                                )
                             )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        TextField(
-                            value = pinInput,
-                            onValueChange = { pinInput = it },
-                            label = { Text("PINコード") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onDone = {
-                                    focusManager.clearFocus()
+                            TextField(
+                                value = pinInput,
+                                onValueChange = { pinInput = it },
+                                label = { Text("PINコード") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        val savedNickname = sharedPreferences.getString(PREF_NICKNAME, null)
+                                        val savedPin = sharedPreferences.getString(PREF_PIN, null)
 
-                                    // エラーチェック
+                                        if (nicknameInput == savedNickname && pinInput == savedPin) {
+                                            Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
+                                            navigateToMainScreen()
+                                        } else {
+                                            Toast.makeText(this@MainActivity, "ニックネームまたはPINコードが間違っています", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            if (errorMessage.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = errorMessage,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Button(
+                                onClick = {
                                     errorMessage = when {
                                         nicknameInput.isEmpty() -> "ニックネームを入力してください"
                                         pinInput.length != 4 -> "PINコードは4桁で入力してください"
@@ -196,46 +153,106 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                                     }
-                                }
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // エラーメッセージの表示
-                        if (errorMessage.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = errorMessage,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("ログイン")
+                            }
                         }
+                    }
+                } else {
+                    // 新規登録画面
+                    var nickname by remember { mutableStateOf("") }
+                    var pin by remember { mutableStateOf("") }
+                    var errorMessage by remember { mutableStateOf("") }
 
-                        Button(
-                            onClick = {
-                                // エラーチェック
-                                errorMessage = when {
-                                    nicknameInput.isEmpty() -> "ニックネームを入力してください"
-                                    pinInput.length != 4 -> "PINコードは4桁で入力してください"
-                                    else -> ""
-                                }
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            TextField(
+                                value = nickname,
+                                onValueChange = { nickname = it },
+                                label = { Text("ニックネーム") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Next
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                                if (errorMessage.isEmpty()) {
-                                    val savedNickname = sharedPreferences.getString(PREF_NICKNAME, null)
-                                    val savedPin = sharedPreferences.getString(PREF_PIN, null)
+                            TextField(
+                                value = pin,
+                                onValueChange = { pin = it },
+                                label = { Text("PINコード") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        // エラーチェック
+                                        errorMessage = when {
+                                            nickname.isEmpty() -> "ニックネームを入力してください"
+                                            pin.length != 4 -> "PINコードは4桁で入力してください"
+                                            else -> ""
+                                        }
 
-                                    if (nicknameInput == savedNickname && pinInput == savedPin) {
-                                        Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
+                                        if (errorMessage.isEmpty()) {
+                                            sharedPreferences.edit {
+                                                putString(PREF_NICKNAME, nickname)
+                                                putString(PREF_PIN, pin)
+                                            }
+                                            Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
+                                            navigateToMainScreen()
+                                        } else {
+                                            Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            if (errorMessage.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = errorMessage,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    // エラーチェック
+                                    errorMessage = when {
+                                        nickname.isEmpty() -> "ニックネームを入力してください"
+                                        pin.length != 4 -> "PINコードは4桁で入力してください"
+                                        else -> ""
+                                    }
+
+                                    if (errorMessage.isEmpty()) {
+                                        sharedPreferences.edit {
+                                            putString(PREF_NICKNAME, nickname)
+                                            putString(PREF_PIN, pin)
+                                        }
+                                        Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
                                         navigateToMainScreen()
                                     } else {
-                                        Toast.makeText(this@MainActivity, "ニックネームまたはPINコードが間違っています", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                                     }
-                                } else {
-                                    Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("ログイン")
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("新規登録")
+                            }
                         }
                     }
                 }
@@ -248,7 +265,6 @@ class MainActivity : ComponentActivity() {
             var result by remember { mutableStateOf("") }
             val sdf = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
-            // 開始時間を記録
             startTime = Date()
 
             Surface(modifier = Modifier.fillMaxSize()) {
@@ -284,23 +300,17 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = result,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Text("結果: $result")
                 }
             }
         }
     }
 
-    private fun calculateTime(sdf: SimpleDateFormat, label: String): String {
+    private fun calculateTime(sdf: SimpleDateFormat, button: String): String {
         val endTime = Date()
-        val durationMillis = endTime.time - startTime.time
-        val durationSeconds = durationMillis / 1000.0
+        val timeDiff = endTime.time - startTime.time
+        val formattedTime = sdf.format(timeDiff)
 
-        val startFormatted = sdf.format(startTime)
-        val endFormatted = sdf.format(endTime)
-
-        return "ボタン「$label」\n開始: $startFormatted\n終了: $endFormatted\n経過: $durationSeconds 秒"
+        return "ボタン: $button, 時間: $formattedTime"
     }
 }
