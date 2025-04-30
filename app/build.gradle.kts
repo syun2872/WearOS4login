@@ -58,6 +58,8 @@ dependencies {
     implementation(libs.core.splashscreen)
     implementation(libs.material3.android)
     implementation(libs.firebase.auth.ktx)
+    implementation(libs.navigation.runtime.android)
+    implementation(libs.firebase.database.ktx)
 
     // テスト関連
     androidTestImplementation(platform(libs.compose.bom))
@@ -66,9 +68,13 @@ dependencies {
     // デバッグ用
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
+    
+        implementation("androidx.compose.ui:ui:1.5.0")  // 基本的なUIコンポーネント
+        implementation("androidx.compose.material:material:1.5.0")  // Material Designコンポーネント
+        implementation("androidx.compose.ui:ui-tooling-preview:1.5.0")  // プレビューサポート
+        implementation("androidx.compose:compose-bom:2023.10.01")  // BOMでComposeの依存関係を統一
+        implementation("androidx.compose.ui:ui-text:1.5.0")  // ui-text（KeyboardOptions, KeyboardTypeなど）
 
-    implementation("androidx.compose.ui:ui-text")
-    implementation("androidx.compose.ui:ui")
+
 
 }
-
