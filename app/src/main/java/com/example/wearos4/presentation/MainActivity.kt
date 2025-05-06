@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -208,10 +209,13 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MainScreen() {
-        var result by remember { mutableStateOf("") }
-        val sdf = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
+        var idToken by remember { mutableStateOf("") }
+        val auth = FirebaseAuth.getInstance()
 
-        startTime = Date()
+        // FirebaseからIDトークンを取得
+        auth.currentUser?.getIdToken(true)?.addOnSuccessListener { result ->
+            idToken = result.token ?: "IDトークンの取得に失敗しました"
+        }
 
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -221,42 +225,13 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(onClick = {
-                        result = calculateTime(sdf, "〇")
-                    }) {
-                        Text("〇")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        result = calculateTime(sdf, "？")
-                    }) {
-                        Text("？")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = {
-                        result = calculateTime(sdf, "☓")
-                    }) {
-                        Text("☓")
-                    }
-                }
+                Text("IDトークン: $idToken")
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("結果: $result")
+                Text("この画面にIDトークンが表示されます")
             }
         }
-    }
-
-    private fun calculateTime(sdf: SimpleDateFormat, button: String): String {
-        val endTime = Date()
-        val timeDiff = endTime.time - startTime.time
-        val formattedTime = sdf.format(timeDiff)
-
-        return "ボタン: $button, 時間: $formattedTime"
     }
 
     enum class Screen {
