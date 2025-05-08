@@ -28,11 +28,26 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var currentScreen by remember { mutableStateOf(Screen.Initial) }
+            var idToken by remember { mutableStateOf("") }
 
             when (currentScreen) {
-                Screen.Initial -> InitialScreen(onLoginClick = { currentScreen = Screen.Login }, onRegisterClick = { currentScreen = Screen.Register })
-                Screen.Register -> RegisterScreen(onRegisterSuccess = { currentScreen = Screen.Main })
-                Screen.Login -> LoginScreen(onLoginSuccess = { currentScreen = Screen.Main })
+                Screen.Initial -> InitialScreen(
+                    onLoginClick = { currentScreen = Screen.Login },
+                    onRegisterClick = { currentScreen = Screen.Register }
+                )
+
+                Screen.Register -> RegisterScreen(onRegisterSuccess = { token ->
+                    idToken = token
+                    currentScreen = Screen.Token
+                })
+
+                Screen.Login -> LoginScreen(onLoginSuccess = { token ->
+                    idToken = token
+                    currentScreen = Screen.Token
+                })
+
+                Screen.Token -> TokenScreen(token = idToken, onProceed = { currentScreen = Screen.Main })
+
                 Screen.Main -> MainScreen()
             }
         }
@@ -60,7 +75,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun RegisterScreen(onRegisterSuccess: () -> Unit) {
+    fun RegisterScreen(onRegisterSuccess: (String) -> Unit) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
         var errorMessage by remember { mutableStateOf("") }
@@ -81,7 +96,6 @@ class MainActivity : ComponentActivity() {
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-
                 TextField(
                     value = password,
                     onValueChange = { password = it },
@@ -108,8 +122,12 @@ class MainActivity : ComponentActivity() {
                             auth.createUserWithEmailAndPassword(email, password)
                                 .addOnCompleteListener { task ->
                                     if (task.isSuccessful) {
-                                        Toast.makeText(this@MainActivity, "新規登録完了！", Toast.LENGTH_SHORT).show()
-                                        onRegisterSuccess()
+                                        auth.currentUser?.getIdToken(true)
+                                            ?.addOnSuccessListener { result ->
+                                                val token = result.token ?: ""
+                                                Toast.makeText(this@MainActivity, "登録成功！", Toast.LENGTH_SHORT).show()
+                                                onRegisterSuccess(token)
+                                            }
                                     } else {
                                         errorMessage = "登録失敗: ${task.exception?.localizedMessage}"
                                         Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
@@ -128,7 +146,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun LoginScreen(onLoginSuccess: () -> Unit) {
+    fun LoginScreen(onLoginSuccess: (String) -> Unit) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
         var errorMessage by remember { mutableStateOf("") }
@@ -149,7 +167,6 @@ class MainActivity : ComponentActivity() {
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-
                 TextField(
                     value = password,
                     onValueChange = { password = it },
@@ -169,8 +186,12 @@ class MainActivity : ComponentActivity() {
                         auth.signInWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
                                 if (task.isSuccessful) {
-                                    Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
-                                    onLoginSuccess()
+                                    auth.currentUser?.getIdToken(true)
+                                        ?.addOnSuccessListener { result ->
+                                            val token = result.token ?: ""
+                                            Toast.makeText(this@MainActivity, "ログイン成功！", Toast.LENGTH_SHORT).show()
+                                            onLoginSuccess(token)
+                                        }
                                 } else {
                                     errorMessage = "ログイン失敗: ${task.exception?.localizedMessage}"
                                     Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
@@ -180,6 +201,27 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("ログイン")
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun TokenScreen(token: String, onProceed: () -> Unit) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("IDトークン:", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(token)
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(onClick = onProceed) {
+                    Text("メイン画面へ")
                 }
             }
         }
@@ -236,6 +278,6 @@ class MainActivity : ComponentActivity() {
     }
 
     enum class Screen {
-        Initial, Register, Login, Main
+        Initial, Register, Login, Token, Main
     }
 }
