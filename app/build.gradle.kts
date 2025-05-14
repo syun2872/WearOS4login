@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation(libs.navigation.runtime.android)
     implementation(libs.firebase.database.ktx)
+    implementation(libs.play.services.fitness)
 
     // テスト関連
     androidTestImplementation(platform(libs.compose.bom))
@@ -76,6 +77,13 @@ dependencies {
         implementation("androidx.compose.ui:ui-text:1.5.0")  // ui-text（KeyboardOptions, KeyboardTypeなど）
         implementation ("com.google.firebase:firebase-auth:21.0.1")
 
+// Google Fit API（Google Play Services Fitness）
+    implementation("com.google.android.gms:play-services-fitness:21.0.0")
 
+    // Google Sign-In（Google アカウント認証）
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+
+    // Firebase Authentication（既に追加済みなら不要）
+    implementation("com.google.firebase:firebase-auth:22.1.2")
 
 }
