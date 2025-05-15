@@ -12,9 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.auth.api.signin.*
-import com.google.android.gms.fitness.*
-import com.google.android.gms.fitness.data.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.fitness.Fitness
+import com.google.android.gms.fitness.FitnessOptions
+import com.google.android.gms.fitness.data.DataType
+import com.google.android.gms.fitness.data.Field
 import com.google.android.gms.fitness.request.DataReadRequest
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -25,6 +27,8 @@ import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var onPermissionGranted: (() -> Unit) // 後から呼び出すコールバック
+
     private val fitnessOptions = FitnessOptions.builder()
         .addDataType(DataType.TYPE_SLEEP_SEGMENT, FitnessOptions.ACCESS_READ)
         .build()
@@ -36,16 +40,6 @@ class MainActivity : ComponentActivity() {
 
         FirebaseApp.initializeApp(this)
         auth = FirebaseAuth.getInstance()
-
-        val account = GoogleSignIn.getAccountForExtension(this, fitnessOptions)
-        if (!GoogleSignIn.hasPermissions(account, fitnessOptions)) {
-            GoogleSignIn.requestPermissions(
-                this,
-                GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
-                account,
-                fitnessOptions
-            )
-        }
 
         setContent {
             var sleepData by remember { mutableStateOf("睡眠データ未取得") }
@@ -59,7 +53,9 @@ class MainActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Button(onClick = {
-                        fetchSleepData { data -> sleepData = data }
+                        requestFitPermission {
+                            fetchSleepData { data -> sleepData = data }
+                        }
                     }) {
                         Text("睡眠データ取得")
                     }
@@ -70,11 +66,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // パーミッションをリクエストして、許可されていればコールバック実行
+    private fun requestFitPermission(onGranted: () -> Unit) {
+        val account = GoogleSignIn.getAccountForExtension(this, fitnessOptions)
+        if (GoogleSignIn.hasPermissions(account, fitnessOptions)) {
+            onGranted()
+        } else {
+            onPermissionGranted = onGranted
+            GoogleSignIn.requestPermissions(
+                this,
+                GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
+                account,
+                fitnessOptions
+            )
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
                 Toast.makeText(this, "Google Fitアクセス許可済み", Toast.LENGTH_SHORT).show()
+                onPermissionGranted() // アクセス許可後に続きの処理
             } else {
                 Toast.makeText(this, "Google Fitアクセス拒否されました", Toast.LENGTH_SHORT).show()
             }
