@@ -3,6 +3,7 @@ package com.example.wearos4.presentation
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.fitness.Fitness
 import com.google.android.gms.fitness.FitnessOptions
 import com.google.android.gms.fitness.data.DataType
@@ -27,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
-    private lateinit var onPermissionGranted: (() -> Unit) // 後から呼び出すコールバック
+    private lateinit var onPermissionGranted: (() -> Unit)
 
     private val fitnessOptions = FitnessOptions.builder()
         .addDataType(DataType.TYPE_SLEEP_SEGMENT, FitnessOptions.ACCESS_READ)
@@ -38,8 +40,23 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Firebase 初期化
         FirebaseApp.initializeApp(this)
         auth = FirebaseAuth.getInstance()
+
+        // Google アカウント（メールアドレス）要求設定（Wear OSでも保険で設定）
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
+        val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        // Google Fit のパーミッション確認
+        val account = GoogleSignIn.getAccountForExtension(this, fitnessOptions)
+        if (GoogleSignIn.hasPermissions(account, fitnessOptions)) {
+            Log.d("FitAuth", "✅ Google Fit の権限あり")
+        } else {
+            Log.d("FitAuth", "❌ Google Fit の権限なし")
+        }
 
         setContent {
             var sleepData by remember { mutableStateOf("睡眠データ未取得") }
@@ -66,12 +83,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // パーミッションをリクエストして、許可されていればコールバック実行
+    // Google Fit 権限リクエスト
     private fun requestFitPermission(onGranted: () -> Unit) {
         val account = GoogleSignIn.getAccountForExtension(this, fitnessOptions)
         if (GoogleSignIn.hasPermissions(account, fitnessOptions)) {
+            Log.d("FitAuth", "✅ Fit 権限すでに許可済み")
             onGranted()
         } else {
+            Log.d("FitAuth", "📥 Fit 権限リクエストを開始")
             onPermissionGranted = onGranted
             GoogleSignIn.requestPermissions(
                 this,
@@ -82,18 +101,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // 権限リクエスト結果を受け取る
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
-                Toast.makeText(this, "Google Fitアクセス許可済み", Toast.LENGTH_SHORT).show()
-                onPermissionGranted() // アクセス許可後に続きの処理
+                Toast.makeText(this, "✅ Google Fit アクセス許可されました", Toast.LENGTH_SHORT).show()
+                Log.d("FitAuth", "🎉 Google Fit 権限付与された")
+                onPermissionGranted()
             } else {
-                Toast.makeText(this, "Google Fitアクセス拒否されました", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "❌ Google Fit アクセスが拒否されました", Toast.LENGTH_SHORT).show()
+                Log.e("FitAuth", "❌ Google Fit 権限が拒否された")
             }
         }
     }
 
+    // 睡眠データ取得関数
     private fun fetchSleepData(onDataReceived: (String) -> Unit) {
         val account = GoogleSignIn.getAccountForExtension(this, fitnessOptions)
 
@@ -121,6 +144,7 @@ class MainActivity : ComponentActivity() {
             }
             .addOnFailureListener {
                 onDataReceived("データ取得失敗: ${it.message}")
+                Log.e("FitAuth", "❌ データ取得エラー: ${it.message}")
             }
     }
 }
