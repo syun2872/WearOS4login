@@ -86,4 +86,5 @@ dependencies {
     // Firebase Authentication（既に追加済みなら不要）
     implementation("com.google.firebase:firebase-auth:22.1.2")
 
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
