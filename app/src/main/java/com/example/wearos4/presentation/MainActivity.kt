@@ -1,217 +1,189 @@
 package com.example.wearos4.presentation
 
+import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 
 class MainActivity : ComponentActivity() {
-
     private lateinit var auth: FirebaseAuth
+    private lateinit var googleSignInClient: GoogleSignInClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Firebase初期化
         FirebaseApp.initializeApp(this)
         auth = FirebaseAuth.getInstance()
 
+        // Googleログインオプション
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id)) // google-services.jsonの値と一致
+            .requestEmail()
+            .build()
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        val launcher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val data: Intent? = result.data
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+            try {
+                val account = task.getResult(Exception::class.java)
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                auth.signInWithCredential(credential).addOnCompleteListener { authResult ->
+                    // サインイン成功・失敗をコールバックで判定
+                }
+            } catch (e: Exception) {
+                // エラー処理
+            }
+        }
+
         setContent {
-            val focusManager = LocalFocusManager.current
-
-            var step by remember { mutableStateOf(1) }
-
             var date by remember { mutableStateOf("") }
-
-            var deepHour by remember { mutableStateOf("") }
-            var deepMin by remember { mutableStateOf("") }
-
-            var lightHour by remember { mutableStateOf("") }
-            var lightMin by remember { mutableStateOf("") }
-
-            var jsonOutput by remember { mutableStateOf("") }
+            var deepSleep by remember { mutableStateOf("") }
+            var lightSleep by remember { mutableStateOf("") }
+            var sendStatus by remember { mutableStateOf("") }
+            var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
+            var showJson by remember { mutableStateOf(false) }
+            var jsonPreview by remember { mutableStateOf("") }
+            val scrollState = rememberScrollState()
 
             Surface(modifier = Modifier.fillMaxSize()) {
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                        .verticalScroll(scrollState)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    item {
-                        Text(
-                            text = when (step) {
-                                1 -> "\u2460 日付を入力（例：20250610）"
-                                2 -> "\u2461 深い睡眠時間を入力"
-                                3 -> "\u2462 浅い睡眠時間を入力"
-                                4 -> "\u2705 入力完了：確認してください"
-                                else -> ""
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontSize = 18.sp
+                    if (!isLoggedIn) {
+                        Button(onClick = {
+                            val signInIntent = googleSignInClient.signInIntent
+                            launcher.launch(signInIntent)
+                        }) {
+                            Text("Googleでログイン")
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = date,
+                            onValueChange = { date = it },
+                            label = { Text("日付 (yyyy-MM-dd)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
                         )
-                    }
-                    item {
-                        when (step) {
-                            1 -> OutlinedTextField(
-                                value = date,
-                                onValueChange = { if (it.all { c -> c.isDigit() }) date = it },
-                                label = { Text("日付（8桁）") },
-                                modifier = Modifier.fillMaxWidth(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                singleLine = true
-                            )
-
-                            2 -> SleepTimeInput(
-                                title = "深い睡眠",
-                                hour = deepHour,
-                                min = deepMin,
-                                onHourChange = { if (it.all { c -> c.isDigit() }) deepHour = it },
-                                onMinChange = { if (it.all { c -> c.isDigit() }) deepMin = it }
-                            )
-
-                            3 -> SleepTimeInput(
-                                title = "浅い睡眠",
-                                hour = lightHour,
-                                min = lightMin,
-                                onHourChange = { if (it.all { c -> c.isDigit() }) lightHour = it },
-                                onMinChange = { if (it.all { c -> c.isDigit() }) lightMin = it }
-                            )
-
-                            4 -> {
-                                val deepTotal = (deepHour.toIntOrNull() ?: 0) * 60 + (deepMin.toIntOrNull() ?: 0)
-                                val lightTotal = (lightHour.toIntOrNull() ?: 0) * 60 + (lightMin.toIntOrNull() ?: 0)
-                                val json = JSONObject().apply {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = deepSleep,
+                            onValueChange = { deepSleep = it.filter { c -> c.isDigit() } },
+                            label = { Text("深い睡眠時間 (分)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = lightSleep,
+                            onValueChange = { lightSleep = it.filter { c -> c.isDigit() } },
+                            label = { Text("浅い睡眠時間 (分)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = {
+                            if (date.isBlank() || deepSleep.isBlank() || lightSleep.isBlank()) {
+                                sendStatus = "すべての項目を入力してください"
+                            } else {
+                                // 送信内容プレビュー用JSON生成
+                                val previewJson = JSONObject().apply {
                                     put("date", date)
-                                    put("deep_sleep_minutes", deepTotal)
-                                    put("light_sleep_minutes", lightTotal)
-                                }
-                                jsonOutput = json.toString(2)
-
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("\uD83D\uDCC5 日付: $date")
-                                    Text("\uD83C\uDF19 深い睡眠: $deepHour 時間 $deepMin 分（$deepTotal 分）")
-                                    Text("\uD83D\uDCA4 浅い睡眠: $lightHour 時間 $lightMin 分（$lightTotal 分）")
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("\uD83D\uDCE6 JSON:")
-                                    Text(jsonOutput)
-                                }
+                                    put("deepSleep", deepSleep.toInt())
+                                    put("lightSleep", lightSleep.toInt())
+                                }.toString(2)
+                                jsonPreview = previewJson
+                                showJson = true
                             }
+                        }) {
+                            Text("送信内容を確認")
                         }
-                    }
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            if (step > 1) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        if (showJson) {
+                            Text("送信予定のJSON:", style = MaterialTheme.typography.bodyMedium)
+                            // プレビュー用JSON表示
+                            Text(jsonPreview, modifier = Modifier.padding(8.dp))
+                            Row {
                                 Button(onClick = {
-                                    focusManager.clearFocus()
-                                    step--
-                                }) {
-                                    Text("\u2190 戻る")
-                                }
-                            }
-                            Button(onClick = {
-                                focusManager.clearFocus()
-                                if (step < 4) step++ else {
-                                    postJsonToApiGateway(jsonOutput) { success, message ->
-                                        runOnUiThread {
-                                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
-                                            if (success) {
-                                                step = 1
-                                                date = ""
-                                                deepHour = ""
-                                                deepMin = ""
-                                                lightHour = ""
-                                                lightMin = ""
-                                                jsonOutput = ""
-                                            }
-                                        }
+                                    sendStatus = "送信中..."
+                                    showJson = false
+                                    sendDataToAws(date, deepSleep.toInt(), lightSleep.toInt()) { success, message ->
+                                        sendStatus = if (success) "送信成功" else "送信失敗: $message"
                                     }
+                                }) {
+                                    Text("この内容でAWSに送信")
                                 }
-                            }) {
-                                Text(if (step < 4) "決定 \u2192" else "送信")
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(onClick = { showJson = false }) {
+                                    Text("キャンセル")
+                                }
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
                         }
+                        Text(sendStatus)
                     }
                 }
             }
         }
     }
 
-    @Composable
-    fun SleepTimeInput(
-        title: String,
-        hour: String,
-        min: String,
-        onHourChange: (String) -> Unit,
-        onMinChange: (String) -> Unit
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("現在の入力: ${hour.ifEmpty { "0" }}時間 ${min.ifEmpty { "0" }}分")
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = hour,
-                    onValueChange = onHourChange,
-                    label = { Text("時間") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.width(120.dp)
-                )
-                OutlinedTextField(
-                    value = min,
-                    onValueChange = onMinChange,
-                    label = { Text("分") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.width(120.dp)
-                )
-            }
-        }
-    }
+    private fun sendDataToAws(date: String, deepSleep: Int, lightSleep: Int, callback: (Boolean, String) -> Unit) {
+        val json = JSONObject()
+        json.put("date", date)
+        json.put("deep_sleep_minutes", deepSleep)
+        json.put("light_sleep_minutes", lightSleep)
 
-    private fun postJsonToApiGateway(jsonBody: String, onResult: (Boolean, String) -> Unit) {
+
+        val jsonString = json.toString()
+        val url = "https://6y9xnelgzf.execute-api.ap-northeast-1.amazonaws.com/SLeep_API/Date_Resource" // ←あなたのAWSエンドポイント
+
         val client = OkHttpClient()
-        val url = "https://6y9xnelgzf.execute-api.ap-northeast-1.amazonaws.com/SLeep_API"
-
-        val requestBody = jsonBody.toRequestBody("application/json; charset=utf-8".toMediaType())
+        val body = RequestBody.create("application/json; charset=utf-8".toMediaType(), jsonString)
 
         val request = Request.Builder()
             .url(url)
-            .post(requestBody)
+            .post(body)
             .build()
 
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                onResult(false, "送信失敗: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = client.newCall(request).execute()
                 if (response.isSuccessful) {
-                    onResult(true, "送信成功: ${response.code}")
+                    callback(true, "")
                 } else {
-                    onResult(false, "失敗コード: ${response.code}")
+                    callback(false, "HTTPエラーコード: ${response.code}")
                 }
+            } catch (e: IOException) {
+                callback(false, e.message ?: "通信エラー")
             }
-        })
+        }
     }
 }
