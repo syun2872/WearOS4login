@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
             var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
             var showJson by remember { mutableStateOf(false) }
             var jsonPreview by remember { mutableStateOf("") }
+            var feedback by remember { mutableStateOf("") }
             val scrollState = rememberScrollState()
 
             Surface(modifier = Modifier.fillMaxSize()) {
@@ -89,7 +91,7 @@ class MainActivity : ComponentActivity() {
                         OutlinedTextField(
                             value = date,
                             onValueChange = { date = it },
-                            label = { Text("日付 (yyyy-MM-dd)") },
+                            label = { Text("日付 (yyyyMMdd)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -114,11 +116,10 @@ class MainActivity : ComponentActivity() {
                             if (date.isBlank() || deepSleep.isBlank() || lightSleep.isBlank()) {
                                 sendStatus = "すべての項目を入力してください"
                             } else {
-                                // 送信内容プレビュー用JSON生成
                                 val previewJson = JSONObject().apply {
-                                    put("date", date)
-                                    put("deepSleep", deepSleep.toInt())
-                                    put("lightSleep", lightSleep.toInt())
+                                    put("Sleep_DynamoDB", date)
+                                    put("deep_sleep", deepSleep.toInt())
+                                    put("light_sleep", lightSleep.toInt())
                                 }.toString(2)
                                 jsonPreview = previewJson
                                 showJson = true
@@ -129,8 +130,14 @@ class MainActivity : ComponentActivity() {
                         Spacer(modifier = Modifier.height(16.dp))
                         if (showJson) {
                             Text("送信予定のJSON:", style = MaterialTheme.typography.bodyMedium)
-                            // プレビュー用JSON表示
-                            Text(jsonPreview, modifier = Modifier.padding(8.dp))
+                            Text(
+                                jsonPreview.trim(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                softWrap = true,
+                                maxLines = Int.MAX_VALUE
+                            )
                             Row {
                                 Button(onClick = {
                                     sendStatus = "送信中..."
@@ -148,7 +155,50 @@ class MainActivity : ComponentActivity() {
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                         }
-                        Text(sendStatus)
+
+                        Button(
+                            onClick = {
+                                if (date.isBlank()) {
+                                    feedback = "日付を入力してください"
+                                } else {
+                                    feedback = "取得中..."
+                                    fetchSleepDataFromAws(date) { deep, light, error ->
+                                        if (error != null) {
+                                            feedback = "取得失敗: $error"
+                                        } else if (deep != null && light != null) {
+                                            feedback = createFeedback(deep, light)
+                                        } else {
+                                            feedback = "データが見つかりません"
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("AWSから睡眠データ取得")
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        if (feedback.isNotBlank()) {
+                            Text(
+                                feedback.trim(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                softWrap = true,
+                                maxLines = Int.MAX_VALUE
+                            )
+                        }
+                        if (sendStatus.isNotBlank()) {
+                            Text(
+                                sendStatus.trim(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                softWrap = true,
+                                maxLines = Int.MAX_VALUE
+                            )
+                        }
                     }
                 }
             }
@@ -157,13 +207,12 @@ class MainActivity : ComponentActivity() {
 
     private fun sendDataToAws(date: String, deepSleep: Int, lightSleep: Int, callback: (Boolean, String) -> Unit) {
         val json = JSONObject()
-        json.put("date", date)
-        json.put("deep_sleep_minutes", deepSleep)
-        json.put("light_sleep_minutes", lightSleep)
-
+        json.put("Sleep_DynamoDB", date) // プライマリキー
+        json.put("deep_sleep", deepSleep)
+        json.put("light_sleep", lightSleep)
 
         val jsonString = json.toString()
-        val url = "https://6y9xnelgzf.execute-api.ap-northeast-1.amazonaws.com/SLeep_API/Date_Resource" // ←あなたのAWSエンドポイント
+        val url = "https://6y9xnelgzf.execute-api.ap-northeast-1.amazonaws.com/SLeep_API/Date_Resource"
 
         val client = OkHttpClient()
         val body = RequestBody.create("application/json; charset=utf-8".toMediaType(), jsonString)
@@ -185,5 +234,60 @@ class MainActivity : ComponentActivity() {
                 callback(false, e.message ?: "通信エラー")
             }
         }
+    }
+
+    private fun fetchSleepDataFromAws(date: String, callback: (Int?, Int?, String?) -> Unit) {
+        // URLをユーザー入力の日付で作成
+        val url = "https://6y9xnelgzf.execute-api.ap-northeast-1.amazonaws.com/SLeep_API/Date_Resource?Sleep_DynamoDB=$date"
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = client.newCall(request).execute()
+                val body = response.body?.string()
+                if (response.isSuccessful && body != null) {
+                    val json = JSONObject(body)
+                    val notFound = json.optBoolean("not_found", false)
+                    if (notFound) {
+                        callback(null, null, null) // データが見つかりません
+                    } else {
+                        // deep_sleep, light_sleepがStringでもIntでもOKにする
+                        val deep = try {
+                            json.getInt("deep_sleep")
+                        } catch (e: Exception) {
+                            try { json.getString("deep_sleep").toInt() } catch (e: Exception) { -1 }
+                        }
+                        val light = try {
+                            json.getInt("light_sleep")
+                        } catch (e: Exception) {
+                            try { json.getString("light_sleep").toInt() } catch (e: Exception) { -1 }
+                        }
+                        if (deep >= 0 && light >= 0) {
+                            callback(deep, light, null)
+                        } else {
+                            callback(null, null, "データが不正です")
+                        }
+                    }
+                } else if (response.code == 404) {
+                    callback(null, null, null) // データが見つかりません
+                } else {
+                    callback(null, null, "HTTPエラーコード: ${response.code}")
+                }
+            } catch (e: IOException) {
+                callback(null, null, e.message ?: "通信エラー")
+            }
+        }
+    }
+
+    private fun createFeedback(deep: Int, light: Int): String {
+        return when {
+            deep >= 120 -> "深い睡眠時間が十分です！よく休めています。"
+            deep >= 60 -> "深い睡眠時間は平均的です。もう少し増やしてみましょう。"
+            else -> "深い睡眠が不足気味です。寝る前のスマホやカフェインを控えてみましょう。"
+        } + "（深い睡眠: ${deep}分, 浅い睡眠: ${light}分）"
     }
 }
